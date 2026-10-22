@@ -42,7 +42,7 @@
 .VPNavBarTranslations,
 .VPNavBarExtra .group.translations,
 .VPNavScreenTranslations {
-  display: none;
+  display: none !important;
 }
 
 .q-lang {

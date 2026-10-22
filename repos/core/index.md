@@ -133,6 +133,90 @@ let recovered = lock::unwrap(&wrap, &password)?;
 
 包裹文件是定长 110 字节，自带 KDF 参数与随机盐，因此旧文件永远读得回来。参数来自文件，属于不可信输入，**边界检查在 Argon2id 运行之前**完成。口令错、参数越界、版本不认识是三种不同的错误。
 
+## 接口说明
+
+公开 API 全部从 crate 根导出；完整签名、示例与平台差异见 [docs.rs](https://docs.rs/qualia2fa-core)。
+
+### 模块与入口
+
+| 模块 | 主要公开项 | 职责 |
+|---|---|---|
+| `otp` | `Algorithm`、`Digits`、`OtpSecret`、`hotp`、`totp`、`hotp_code`、`totp_code`、`verify_code`、`verify_with_drift`、`steam_guard_code` | TOTP / HOTP / Steam Guard |
+| `motp` | `MotpPin`、`motp_code` | mOTP |
+| `yaotp` | `YandexPin`、`normalize_secret`、`yaotp_code` | Yandex OTP |
+| `base32` | `encode`、`decode`、`decode_strict` | RFC 4648 编码与两种解码模式 |
+| `uri` | `OtpAuth`、`UriType`、`parse`、`serialize`、`DEFAULT_PERIOD` | `otpauth://` 与 `motp:` |
+| `vault` | `Vault`、`VaultFile`、`Entry`、`EntryKind`、`EntryIcon`、`Group`、`GroupChild`、`EntryId`、`GroupId`、`Tombstone`、`MasterKey` | 保险库内存模型与文件格式 |
+| `lock` | `wrap`、`unwrap`、`WrapHeader`、`FILE_LEN` | 解锁密码包裹 |
+| `recovery` | `KdfParams`、`export`、`import` | 恢复密钥文件 |
+| `portable` | `PortableKind`、`PortableFile`、`detect`、`parse`、`pack_plain`、`pack_encrypted` | `.q2fa` 可移植容器 |
+| `import` | `ImportFormat`、`import`、`ImportReport`、`ImportedEntry`、`ImportProblem`、`apply::compare`、`apply::apply` | Aegis JSON / HTML / TXT 导入 |
+| `export` | `ExportFormat`、`GroupCarrying`、`export` | 六种导出格式 |
+| `flow` | `DeviceKeys`、`SecureStore`、`registration`、`Login`、`Joiner`、`Registered`、`open_vault`、`open_portable` | 注册、登录与恢复的编排层 |
+| `pairing` | `QrPayload`、`PendingSession`、`JoinerSession`、`Adoption`、`NonceLog`、`begin`、`join` | 配对协议的消息与状态机 |
+| `auth` | `Verifier`、`Responder`、`Verified`、`begin`、`accept`、`confirm` | 挑战-应答 |
+| `sync` | `Payload`、`PayloadHeader`、`PayloadKind`、`Record`、`SyncId`、`derive_record_key`、`derive_envelope_key` | 同步载荷与合并 |
+| `transport` | `Transport`、`TransportCapabilities`、`Recipient`、`Roster`、`SyncSession`、`SyncOutcome`、`SharePlan` | 通道抽象与会话 |
+| `secret` | `SecretBytes`、`SecretString`、`SecretBox`、`ExposeSecret`、`ExposeSecretMut` | `secrecy` 类型的再导出 |
+
+### 保险库
+
+| 类别 | API | 说明 |
+|---|---|---|
+| 读取 | `Vault::len` / `is_empty` / `tombstone_count` / `iter` / `get` / `get_tombstone` | 活条目与墓碑分开读取 |
+| 条目 | `Vault::insert` / `insert_with_id` / `replace` / `remove` / `record_tombstone` / `forget_tombstone` | `remove` 留墓碑；`record_tombstone` 用于对端墓碑 |
+| 分组 | `Vault::groups` / `group` / `children_of` / `parent_of` / `depth_of` / `top_group` / `ordering` / `group_of` / `entries_in` | 树状分组与混合顺序 |
+| 分组编辑 | `create_group` / `create_group_in` / `rename_group` / `remove_group` / `set_children` / `set_ordering` / `assign_to_group` | `set_children` 写整条子节点列表 |
+| 文件 | `VaultFile::create` / `with_master_key` / `master_key` / `vault` / `vault_mut` / `split_mut` / `serialize` / `parse` / `into_parts` | 主密钥与保险库绑定 |
+| 便利函数 | `entry_from_parsed_uri`、`write_file_atomically`、`read_file` | 从 URI 建条目、原子落盘、读文件 |
+
+`Vault::remove` 返回被删除的条目，同时留下墓碑；`replace` 保留条目标识、不留墓碑。**不要**用「删除 + 新增」实现修改。
+
+### 注册与登录
+
+| API | 说明 |
+|---|---|
+| `DeviceKeys::get_or_create(label)` / `sign(label, message)` | 端侧必须实现；身份必须可重复取得并立即持久化 |
+| `SecureStore::load_master_key` / `store_master_key` / `delete_master_key` / `is_hardware_backed` | 主密钥的持久化；`Ok(None)` 与 `Err` 含义不同 |
+| `registration(keys, store, label)` → `Registered` | 生成主密钥、取得设备身份、写入平台存储 |
+| `Login::new()` / `payload()` / `authorize(msg1, master)` | 已登录设备发起登录并授权 |
+| `Joiner::from_base32(text, label)` / `request(keys)` / `complete(msg2, keys, store)` | 新设备扫码、请求、完成登录 |
+| `open_vault(store, data)` | 用存储里的主密钥打开保险库 |
+| `master_key_from_bytes` / `master_key_to_bytes` | 主密钥字节与 `MasterKey` 的边界转换 |
+| `open_portable(file, passphrase, store)` → `PortableRestore` | 打开 `.q2fa` 容器 |
+| `export_recovery_key` / `import_recovery_key` | 恢复密钥的导出与导入 |
+
+### 验证码与 URI
+
+| API | 说明 |
+|---|---|
+| `otp::totp_code(secret, unix_time, period, algorithm, digits)` / `hotp_code(secret, counter, algorithm, digits)` | 计算验证码；时间为 `u64` Unix 秒 |
+| `otp::verify_code(expected, provided)` / `verify_with_drift(...)` | 常量时间比较；后者返回命中的偏移步数 |
+| `otp::steam_guard_code(secret, unix_time)` | Steam Guard 5 位字母表 |
+| `uri::parse(input)` / `uri::serialize(auth)` | `otpauth://` 与 `motp:` 的解析与序列化 |
+| `base32::decode_strict(input)` | 严格 Base32；宽容模式用 `decode` |
+
+### 同步与会话
+
+| API | 说明 |
+|---|---|
+| `Payload::from_vault(master, sender, vault)` | 从本机保险库生成完整载荷 |
+| `Payload::request(sender)` | 生成「把你的状态发给我」的请求载荷 |
+| `Payload::peek(data)` | 只读明文头部，用于查重放日志；不认证任何内容 |
+| `Payload::seal(master)` / `Payload::open(master, data)` | 加密与解密载荷 |
+| `Payload::open_records(master)` | 逐条解密并返回 `OpenedRecord` |
+| `SyncSession::open(master, vault, seen)` / `restricted(...)` | 开一次同步会话；`seen` 是跨会话的重放日志 |
+| `SyncSession::send` / `receive` / `plan_share` | 发送、合并、先判断装不装得下 |
+| `Transport::capabilities` / `local_device` / `send` / `receive` / `peers` | 通道契约；端侧与局域网通道都实现它 |
+
+### 错误与契约
+
+- 所有可失败 API 返回 `Result<T, Error>`；`Error` 是 `#[non_exhaustive]`，crate 外必须保留通配分支。
+- 错误绝不携带秘密材料：不放原始输入、密钥字节或 OTP 码。
+- 任何输入都不得导致 panic；唯一的失败方式是返回 `Error`。
+- `SecureStore::load_master_key` 的 `Ok(None)` 表示「从未注册或登录」，`Err` 表示「存过但读不出来」——两者混用会让用户被引导重新注册并永久丢失数据。
+- `DeviceKeys::get_or_create` 必须幂等，并且**立即持久化**：登录请求与应答之间可能隔很久，只存在内存里的身份一旦进程退出就永久丢失。
+
 ## 设计约定
 
 ### 无 I/O、无时钟

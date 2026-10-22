@@ -114,6 +114,63 @@ qualia-transport = { version = "0.1", features = ["iroh-lan"] }
 
 组播发现与二维码**不**需要这个 feature——它只带进 QUIC 传输层。注意三点：它会显著增大依赖树与构建时间；它的最低 Rust 版本是 **1.91**（iroh 1.3.0 的要求），高于本 crate 的 1.89；「不联网」目前只到「不构建 relay、不注册 DNS/pkarr、关掉 HTTPS 探测」这一层，抓包实证尚未完成。
 
+## 接口说明
+
+crate 根导出 `qr`、`frame`、`envelope`、`lan` 四个模块；`lan` 下分 `lobby`（组播发现）与 `transport`（iroh 数据面，feature `iroh-lan`）。完整签名见 [docs.rs](https://docs.rs/qualia-transport)。
+
+### 二维码（`qr`）
+
+| 项 | 说明 |
+|---|---|
+| `EcLevel` | `Low` / `Medium` / `Quartile` / `High`；`letter`、`from_letter` |
+| `QrProfile::new(ec, max_version)` | 声明通道能力；构造时实时二分出两个容量 |
+| `payload_capacity()` / `frame_payload_capacity()` / `exchange_capacity(n)` | 单帧、拆帧每张、最多 n 张的总容量 |
+| `encode_payload(payload)` / `encode_payload_frames(payload, max_frames)` | 单帧与多帧编码 |
+| `qr::encode_text(text, ec, max_version)` | 原样编码文本，不过信封 |
+| `Symbol` | `version`、`ec_level`、`mask`、`size`、`modules`、`module(x, y)`、`render(scale, quiet_zone)` |
+| `qr::scan::decode_text` / `decode_payload` / `decode_frame` | 从像素解码文本、载荷或一帧 |
+| `GrayImage` | 灰度像素缓冲；输入不是图片文件 |
+
+### 文本信封与拆帧（`envelope`、`frame`）
+
+| 项 | 说明 |
+|---|---|
+| `envelope::encode(payload)` / `decode(text)` | `Q2FA1:<帧号>/<帧数>:<BASE32>` 的封装与解析 |
+| `frame::encode_frames(payload, capacity)` | 按给定容量切帧 |
+| `Frame` / `frame::decode_frame(text)` | 一帧的结构与解析 |
+| `Reassembler::new(capacity)` / `from_first_frame()` | 已知容量 / 从第一帧观察容量 |
+| `Reassembler::push(text)` / `accept(frame)` | 接受任意顺序、重复扫描 |
+| `missing()` / `received()` / `expected_frames()` | 还差哪几张、已收几张、总共几张 |
+
+### 局域网（`lan`）
+
+| 项 | 说明 |
+|---|---|
+| `LanAddress::new(endpoint_key, port)` | 42 字节连接记录 |
+| `encode` / `decode` / `to_qr_text` / `from_qr_text` | 定长记录与单张二维码文本 |
+| `to_qr_symbols(profile, max_frames)` / `to_qr_frame_texts(...)` | 交给二维码那一半渲染或取文本 |
+| `LanAddressScanner::new()` / `push(text)` / `missing()` / `expected_codes()` | 拼装多张连接记录 |
+| `Lobby::open(me, endpoint_key, port)` / `open_with(...)` | 开始组播公告与收听 |
+| `Lobby::try_poll()` / `poll(timeout)` / `announce_now()` / `shutdown()` / `view()` | 取事件、立刻公告、关闭 |
+| `LanConfig` | 组播组、端口、TTL 与指定网卡；`interface` 可收窄候选网卡 |
+| `Event` / `EventKind` / `Peer` / `PeerStatus` / `LanView` / `candidate_interfaces()` | 发现结果与网卡枚举 |
+| `IrohLan::open(device, secret_key)` / `open_with(...)` | 打开 QUIC 数据面（feature `iroh-lan`） |
+| `remember_peer(PeerAddress)` / `forget_peer(device)` / `connected_peers()` | 登记、忘记、列出对端 |
+| `send(Recipient, message)` / `send_blocking` / `try_receive` / `receive_timeout` | 定向或广播发送、非阻塞或超时接收 |
+| `shutdown()` | 关闭端点与运行时；重复调用安全 |
+| `Recipient` / `PeerAddress` / `ALPN` / `MAX_MESSAGE_LEN` / `INBOX_CAPACITY` | 收件人、可拨地址与数据面常量 |
+
+`Lobby` 的公告定长 84 字节，`LanAddress` 定长 42 字节；组播 TTL 固定为 1。发现**不做认证**，真正的身份由连接握手证明。
+
+### 错误与契约
+
+- 所有可失败 API 返回 `Result<T, Error>`；`Error` 是 `#[non_exhaustive]`，端侧必须保留兜底分支。
+- 装不下返回错误并带上 `needed` / `limit`，绝不产出「差一点」的码。
+- 拼装层只做形状检查；认证始终在载荷的 AEAD 层。
+- 二维码与局域网线格式是纯逻辑；只有 `Lobby` 开 socket、起后台线程、读时钟。
+- 任何输入都不得导致 panic；`#![forbid(unsafe_code)]` 全程成立。
+- 本库**不生成密钥材料**：二维码编码是确定性的，组播大厅只读取调用方给的端点公钥与端口。
+
 ## 设计约定
 
 - **装不下是一个错误，不是一个近似。** 超过上限就返回错误，绝不产出「差一点」的码。错误带着 `needed` 与 `limit`，调用方据此告诉用户「差多少」。

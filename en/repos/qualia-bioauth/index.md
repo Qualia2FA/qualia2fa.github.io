@@ -83,6 +83,63 @@ The platform-private payload is opaque; the outer layer only checks the magic, v
 
 `MasterKey` is 32 bytes, zeroizes on drop, and its `Debug` output shows no content.
 
+## Interface
+
+Full signatures are on [docs.rs](https://docs.rs/qualia-bioauth).
+
+### Core types
+
+| Item | Notes |
+|---|---|
+| `MasterKey` | 32-byte key; `from_array([u8; 32])`, `from_bytes(&[u8])`, `expose_secret()`, `ct_eq()`; zeroized on drop, `Debug` prints the length only |
+| `MASTER_KEY_LEN` | 32 |
+| `AuthBoundKeyStore` | The platform auth-bound key-store trait |
+| `platform::open_best_available()` | Returns the best implementation for this platform (`Box<dyn AuthBoundKeyStore>`); no prompt, no platform access |
+
+### `AuthBoundKeyStore` methods
+
+| Method | Notes |
+|---|---|
+| `availability()` | Report whether this machine can use the path, without prompting: `Available` / `Unavailable` / `Unsupported` |
+| `create()` | Create the platform key or credential; may prompt; idempotent |
+| `wrap(&master)` | Wrap the master key and return the complete blob (magic included) |
+| `unwrap(&blob)` | Complete one platform authentication and return the master key; a blob from another backend reports `WrongBackend` |
+| `delete_blob(&blob)` | Delete the platform credential the blob names; used when the path is turned off |
+| `delete()` | Delete this store's platform key; idempotent |
+
+The three `Availability` variants are deliberately separate:
+
+| Variant | Meaning |
+|---|---|
+| `Available { backend, hardware_backed }` | The mechanism works; `hardware_backed` is what the platform **actually** reported |
+| `Unavailable { reason }` | The mechanism exists, but this machine or user cannot use it now (no Hello enrolment, a removed fingerprint, an Android version below 28) |
+| `Unsupported { reason }` | This build has no backend for the platform |
+
+### Outer format
+
+| Item | Notes |
+|---|---|
+| `AuthBlob` | `magic + version + backend + length + wrapped` |
+| `AuthBlob::new(backend, wrapped)` / `parse(bytes)` / `encode()` | Construct, parse, serialise |
+| `AuthBlob::backend()` / `wrapped()` / `expect_backend(expected)` | Read the backend and payload; reject another backend |
+| `FORMAT_VERSION` / `HEADER_LEN` / `MAX_WRAPPED_LEN` / `MAX_BLOB_LEN` | Format constants |
+
+### Host side
+
+| Item | Notes |
+|---|---|
+| `PlatformSealer` | The narrow interface a host implements: one prompt plus one AES-GCM operation |
+| `DelegatingKeyStore` | Adapts a `PlatformSealer` into an `AuthBoundKeyStore` for the FFI or host side |
+
+### Errors and contracts
+
+- Every fallible API returns `Result<T, Error>`; `Error` is `#[non_exhaustive]`.
+- When the platform is unavailable, return `Unavailable` / `Unsupported`; **never** fall back to a software key.
+- `wrap` may prompt; `availability` does not. Ask `availability` before offering the path.
+- A blob is not a secret, but do not log it: a copied blob is still a target.
+- No input may panic; errors and `Debug` contain no key or payload bytes.
+- `unsafe` is allowed only in platform backends, and every block states its `// SAFETY:` reason.
+
 ## Windows backend
 
 It requires the platform authenticator to really return `hmac-secret` from `GetAssertion`. The attestation's `bPrfEnabled` is **not** used as the criterion: on Windows 11 23H2 the credential is created with that flag at zero. The library distrusts the flag and treats the first assertion as the test — 32 bytes returned means success; a refusal or a missing hmac-secret means `Unavailable`.

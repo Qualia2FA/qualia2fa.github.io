@@ -20,25 +20,85 @@ The Rust crate owns the blob format and the error taxonomy; this library owns th
 ## Usage
 
 ```kotlin
+// availability / seal / unseal are suspend; call them from a coroutine or a worker thread.
 val sealer = KeystoreBiometricSealer(activity)
 
-when (val available = sealer.availability()) {
-    is Availability.Available -> { /* offer the biometric path */ }
-    is Availability.Unavailable -> { /* mechanism exists, this user cannot use it */ }
-    is Availability.Unsupported -> { /* API level too low; password only */ }
+lifecycleScope.launch {
+    when (val available = sealer.availability()) {
+        is Availability.Available -> { /* offer the biometric path */ }
+        is Availability.Unavailable -> { /* mechanism exists, this user cannot use it */ }
+        is Availability.Unsupported -> { /* API level too low; password only */ }
+    }
+
+    // Seal: prompts once, returns the bytes to persist.
+    val envelope = sealer.seal(masterKey)
+
+    // Unseal: prompts once, returns the same key or throws.
+    val restored = sealer.unseal(envelope)
+
+    // Turning the path off deletes the platform key; the envelope becomes dead.
+    sealer.delete()
 }
-
-// Seal: prompts once, returns the bytes to persist.
-val envelope = sealer.seal(masterKey)
-
-// Unseal: prompts once, returns the same key or throws.
-val restored = sealer.unseal(envelope)
-
-// Turning the path off deletes the platform key; the envelope becomes dead.
-sealer.delete()
 ```
 
 The library never sees the key material that protects the envelope: the Keystore key is created with `setUserAuthenticationRequired(true)`, so the platform itself refuses to use it until the user has authenticated.
+
+## Interface
+
+The full declarations live in the repository sources and the generated Dokka documentation.
+
+### `BiometricSealer`
+
+| Member | Notes |
+|---|---|
+| `suspend fun availability(): Availability` | Report whether this device can use the path, without prompting |
+| `suspend fun seal(plaintext: ByteArray): ByteArray` | Prompt once and return the envelope to persist |
+| `suspend fun unseal(envelope: ByteArray): ByteArray` | Prompt once and return the same plaintext |
+| `fun delete()` | Delete the platform key; existing envelopes become dead |
+
+### `KeystoreBiometricSealer`
+
+```kotlin
+class KeystoreBiometricSealer(
+    activity: FragmentActivity,
+    alias: String = DEFAULT_ALIAS,
+    promptInfo: PromptText = PromptText(),
+) : BiometricSealer
+```
+
+| Item | Notes |
+|---|---|
+| `activity` | Host of `BiometricPrompt`; construct per screen, do not keep it alive |
+| `alias` | The Keystore entry name; the default suits a single account |
+| `promptInfo` | Title, subtitle and cancel label of the system prompt |
+| `PromptText(title, subtitle, cancel)` | Filled by the caller in the current interface language |
+
+### `Availability`
+
+| Variant | Meaning |
+|---|---|
+| `Available(backend: String, hardwareBacked: Boolean)` | The mechanism works; `backend` is what actually answered |
+| `Unavailable(reason: String)` | The mechanism exists, but this device or user cannot use it now |
+| `Unsupported(reason: String)` | The API level is too low or no mechanism exists; password only |
+
+### Exceptions
+
+`BiometricAuthException` is a sealed class thrown by `seal` / `unseal`:
+
+| Subclass | Meaning |
+|---|---|
+| `Cancelled` | The user dismissed the system prompt |
+| `Unavailable` | The platform mechanism is temporarily unavailable |
+| `Unsupported` | This build or API level cannot do it |
+| `EnvelopeInvalid` | The envelope is corrupt or was not written by this library |
+
+### Contracts
+
+- `availability()` does not prompt; `seal` / `unseal` do. Ask availability before offering the path.
+- A new biometric enrolment invalidates the Keystore key, so the envelope stops opening; fall back to the password rather than recreating the key over it.
+- When the platform cannot authenticate there is **no fallback to a software key**.
+- The library does no I/O: the envelope is returned for the caller to persist.
+- No input may panic; errors contain no key or envelope bytes.
 
 ## What it guarantees, and what it does not
 

@@ -58,6 +58,48 @@ device::verify(signer.public_key(), message, &signature)?;
 Microsoft Platform Crypto Provider 会接受写入的密钥、然后拒绝把材料导出（`NTE_PERM`）。一个拿不回材料的库不满足「直接」的契约，所以它如实报告 `Backend::Software`；想要 TPM 保护请选**包裹**形式。
 :::
 
+## 接口说明
+
+crate 只导出两个模块：`device`（公钥侧）与 `keystore`（平台密钥库）。完整签名见 [docs.rs](https://docs.rs/qualia-dik)。
+
+### `device` 模块
+
+| 项 | 说明 |
+|---|---|
+| `DeviceId` | 32 字节设备指纹；`from_public_key`、`from_bytes`、`as_bytes`、`to_hex` |
+| `DevicePublicKey` | SEC1 公钥；`from_sec1_bytes`、`as_sec1_bytes`、`device_id` |
+| `DeviceSignature` | 64 字节 ECDSA 签名；`from_bytes`、`as_bytes` |
+| `device::verify(public_key, message, signature)` | 用 SHA-256 计算摘要并验签；不需要密钥库 |
+| `PUBLIC_KEY_LEN` / `SIGNATURE_LEN` / `DEVICE_ID_LEN` | 长度常量 |
+
+### `keystore` 模块
+
+| 类型 / 方法 | 说明 |
+|---|---|
+| `Backend` | `Tpm`、`SecureEnclave`、`AndroidKeystore`、`Software`、`Unavailable`；`is_hardware_backed`、`as_str` |
+| `DeviceKeyStore` | `backend()`、`open(label)`、`create(label)`、`delete(label)`、`open_or_create(label)` |
+| `DeviceSigner` | `backend()`、`public_key()`、`sign(message)`、`sign_digest(digest)` |
+| `DirectMasterKeyStore` | `backend()`、`store(label, key)`、`load(label)`、`delete(label)` |
+| `WrappedMasterKeyStore` | `backend()`、`store(label, key) -> WrappedMasterKey`、`load(label, &wrapped)`、`delete(label)` |
+| `MasterKey` | 32 字节；`from_bytes([u8; 32])`、`as_bytes()`；`Drop` 时擦除，`Debug` 只打印长度 |
+| `WrappedMasterKey` | 不透明的平台包裹字节；`from_bytes`、`as_bytes`、`into_bytes` |
+| `PlatformKeyStore` | 当前平台的 `DeviceKeyStore` 别名；Windows / Android 的 `open_best_available()` 返回 `Result` |
+| `PlatformDirectMasterKeyStore` / `PlatformWrappedMasterKeyStore` | 当前平台的两种主密钥存储 |
+| `PlatformProvider` | Windows 上选择 TPM 或软件提供程序（`Tpm` / `Software`） |
+| `platform_backend_is_implemented()` | 当前平台是否有后端实现（**不探测硬件是否可用**） |
+| `sha256(message)` | 项目统一的消息摘要 |
+
+`platform_backend_is_implemented()` 回答的是「这个平台有没有实现」，不是「这台机器能不能用」；运行时的真实情况要看 `backend()`。
+
+### 错误与契约
+
+- 所有可失败操作返回 `Result<T, Error>`；`Error` 是 `#[non_exhaustive]`。
+- `label` 是持久名字，只允许 ASCII 字母、数字、`-`、`_`、`.`；`create` 不覆盖已有密钥，`open_or_create` 才是有则打开、无则创建。
+- `delete` 不可逆；调用前取得用户确认。
+- `sign` 对**消息**签名，`sign_digest` 对**摘要**签名；消息模式固定使用 SHA-256，调用方不要自己先哈希。
+- `backend()` 必须如实报告实际后端；没有硬件时返回 `Software`，不得伪装成 `Tpm`。
+- 任何输入都不得导致 panic；错误里不得出现秘密材料。
+
 ## 主密钥的两种存法
 
 平台密钥库除了设备身份密钥，还持有**应用的主密钥**——保险库文件就是用它加密的。主密钥是 `MasterKey` 里 32 字节的不透明材料：本 crate 只把它在调用方与平台之间搬运，不从中派生任何东西。有两种存法，**由调用方选哪个类型决定**，不是运行期开关：

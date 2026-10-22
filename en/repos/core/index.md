@@ -134,6 +134,90 @@ let recovered = lock::unwrap(&wrap, &password)?;
 
 The wrap file is a fixed 110 bytes and carries its own KDF parameters and random salt, so old files remain readable forever. The parameters come from the file and are untrusted input, so **bounds checks happen before Argon2id runs**. A wrong passphrase, out-of-range parameters and an unknown version are three distinct errors.
 
+## Interface
+
+Every public API is exported from the crate root; full signatures, examples and platform notes live on [docs.rs](https://docs.rs/qualia2fa-core).
+
+### Modules and entry points
+
+| Module | Main public items | Responsibility |
+|---|---|---|
+| `otp` | `Algorithm`, `Digits`, `OtpSecret`, `hotp`, `totp`, `hotp_code`, `totp_code`, `verify_code`, `verify_with_drift`, `steam_guard_code` | TOTP / HOTP / Steam Guard |
+| `motp` | `MotpPin`, `motp_code` | mOTP |
+| `yaotp` | `YandexPin`, `normalize_secret`, `yaotp_code` | Yandex OTP |
+| `base32` | `encode`, `decode`, `decode_strict` | RFC 4648 encoding and two decoding modes |
+| `uri` | `OtpAuth`, `UriType`, `parse`, `serialize`, `DEFAULT_PERIOD` | `otpauth://` and `motp:` |
+| `vault` | `Vault`, `VaultFile`, `Entry`, `EntryKind`, `EntryIcon`, `Group`, `GroupChild`, `EntryId`, `GroupId`, `Tombstone`, `MasterKey` | In-memory vault and file format |
+| `lock` | `wrap`, `unwrap`, `WrapHeader`, `FILE_LEN` | Unlock-password wrap |
+| `recovery` | `KdfParams`, `export`, `import` | Recovery-key file |
+| `portable` | `PortableKind`, `PortableFile`, `detect`, `parse`, `pack_plain`, `pack_encrypted` | `.q2fa` portable containers |
+| `import` | `ImportFormat`, `import`, `ImportReport`, `ImportedEntry`, `ImportProblem`, `apply::compare`, `apply::apply` | Aegis JSON / HTML / TXT import |
+| `export` | `ExportFormat`, `GroupCarrying`, `export` | Six export formats |
+| `flow` | `DeviceKeys`, `SecureStore`, `registration`, `Login`, `Joiner`, `Registered`, `open_vault`, `open_portable` | Registration, login and recovery orchestration |
+| `pairing` | `QrPayload`, `PendingSession`, `JoinerSession`, `Adoption`, `NonceLog`, `begin`, `join` | Pairing messages and state machines |
+| `auth` | `Verifier`, `Responder`, `Verified`, `begin`, `accept`, `confirm` | Challenge-response |
+| `sync` | `Payload`, `PayloadHeader`, `PayloadKind`, `Record`, `SyncId`, `derive_record_key`, `derive_envelope_key` | Sync payloads and merging |
+| `transport` | `Transport`, `TransportCapabilities`, `Recipient`, `Roster`, `SyncSession`, `SyncOutcome`, `SharePlan` | Channel abstraction and sessions |
+| `secret` | `SecretBytes`, `SecretString`, `SecretBox`, `ExposeSecret`, `ExposeSecretMut` | Re-exports of the `secrecy` types |
+
+### The vault
+
+| Area | API | Notes |
+|---|---|---|
+| Read | `Vault::len` / `is_empty` / `tombstone_count` / `iter` / `get` / `get_tombstone` | Live entries and tombstones are read separately |
+| Entries | `Vault::insert` / `insert_with_id` / `replace` / `remove` / `record_tombstone` / `forget_tombstone` | `remove` leaves a tombstone; `record_tombstone` stores a peer's tombstone |
+| Groups | `Vault::groups` / `group` / `children_of` / `parent_of` / `depth_of` / `top_group` / `ordering` / `group_of` / `entries_in` | Tree groups and mixed child order |
+| Group editing | `create_group` / `create_group_in` / `rename_group` / `remove_group` / `set_children` / `set_ordering` / `assign_to_group` | `set_children` writes a whole child list |
+| Files | `VaultFile::create` / `with_master_key` / `master_key` / `vault` / `vault_mut` / `split_mut` / `serialize` / `parse` / `into_parts` | Binds the master key to the vault |
+| Convenience | `entry_from_parsed_uri`, `write_file_atomically`, `read_file` | Build from a URI, atomic write, file read |
+
+`Vault::remove` returns the removed entry and leaves a tombstone; `replace` keeps the entry ID and leaves none. **Never** implement an edit as "delete + add".
+
+### Registration and login
+
+| API | Notes |
+|---|---|
+| `DeviceKeys::get_or_create(label)` / `sign(label, message)` | Implemented by the host; the identity must be retrievable repeatedly and persisted immediately |
+| `SecureStore::load_master_key` / `store_master_key` / `delete_master_key` / `is_hardware_backed` | Master-key persistence; `Ok(None)` and `Err` mean different things |
+| `registration(keys, store, label)` → `Registered` | Generate the master key, obtain the device identity, write to the platform store |
+| `Login::new()` / `payload()` / `authorize(msg1, master)` | A signed-in device starts a login and authorises it |
+| `Joiner::from_base32(text, label)` / `request(keys)` / `complete(msg2, keys, store)` | A new device scans, requests and completes |
+| `open_vault(store, data)` | Open a vault with the master key in storage |
+| `master_key_from_bytes` / `master_key_to_bytes` | Convert between master-key bytes and `MasterKey` |
+| `open_portable(file, passphrase, store)` → `PortableRestore` | Open a `.q2fa` container |
+| `export_recovery_key` / `import_recovery_key` | Export and import a recovery key |
+
+### Codes and URIs
+
+| API | Notes |
+|---|---|
+| `otp::totp_code(secret, unix_time, period, algorithm, digits)` / `hotp_code(secret, counter, algorithm, digits)` | Compute a code; time is `u64` Unix seconds |
+| `otp::verify_code(expected, provided)` / `verify_with_drift(...)` | Constant-time comparison; the latter returns the matching offset |
+| `otp::steam_guard_code(secret, unix_time)` | Steam Guard's 5-character alphabet |
+| `uri::parse(input)` / `uri::serialize(auth)` | Parse and serialise `otpauth://` and `motp:` |
+| `base32::decode_strict(input)` | Strict Base32; use `decode` for the lenient mode |
+
+### Sync and sessions
+
+| API | Notes |
+|---|---|
+| `Payload::from_vault(master, sender, vault)` | Build a full payload from the local vault |
+| `Payload::request(sender)` | Build a "send me your state" request payload |
+| `Payload::peek(data)` | Read the plaintext header for the replay log; authenticates nothing |
+| `Payload::seal(master)` / `Payload::open(master, data)` | Encrypt and decrypt a payload |
+| `Payload::open_records(master)` | Decrypt record by record into `OpenedRecord` |
+| `SyncSession::open(master, vault, seen)` / `restricted(...)` | Open a session; `seen` is the cross-session replay log |
+| `SyncSession::send` / `receive` / `plan_share` | Send, merge, or decide whether it fits first |
+| `Transport::capabilities` / `local_device` / `send` / `receive` / `peers` | The channel contract implemented by hosts and the LAN channel |
+
+### Errors and contracts
+
+- Every fallible API returns `Result<T, Error>`; `Error` is `#[non_exhaustive]`, so code outside the crate must keep a wildcard arm.
+- An error never carries secret material: no original input, key bytes or OTP codes.
+- No input may panic; the only failure mode is an `Error`.
+- `SecureStore::load_master_key` returning `Ok(None)` means "never registered or logged in"; `Err` means "something was stored but cannot be read". Conflating them sends the user to re-register and lose data permanently.
+- `DeviceKeys::get_or_create` must be idempotent and **persist immediately**: the login request and reply can be far apart, and an identity that lives only in memory is lost forever when the process exits.
+
 ## Design contracts
 
 ### No I/O, no clock

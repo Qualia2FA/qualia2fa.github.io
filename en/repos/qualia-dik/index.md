@@ -58,6 +58,48 @@ device::verify(signer.public_key(), message, &signature)?;
 The Microsoft Platform Crypto Provider accepts the key and then refuses to export the material (`NTE_PERM`). A store that cannot hand the material back does not satisfy the "direct" contract, so it reports `Backend::Software` honestly. Choose the **wrapped** form when TPM protection is wanted.
 :::
 
+## Interface
+
+The crate exports two modules: `device` (the public-key side) and `keystore` (platform key stores). Full signatures are on [docs.rs](https://docs.rs/qualia-dik).
+
+### The `device` module
+
+| Item | Notes |
+|---|---|
+| `DeviceId` | 32-byte device fingerprint; `from_public_key`, `from_bytes`, `as_bytes`, `to_hex` |
+| `DevicePublicKey` | SEC1 public key; `from_sec1_bytes`, `as_sec1_bytes`, `device_id` |
+| `DeviceSignature` | 64-byte ECDSA signature; `from_bytes`, `as_bytes` |
+| `device::verify(public_key, message, signature)` | Hash with SHA-256 and verify; no key store needed |
+| `PUBLIC_KEY_LEN` / `SIGNATURE_LEN` / `DEVICE_ID_LEN` | Length constants |
+
+### The `keystore` module
+
+| Type / method | Notes |
+|---|---|
+| `Backend` | `Tpm`, `SecureEnclave`, `AndroidKeystore`, `Software`, `Unavailable`; `is_hardware_backed`, `as_str` |
+| `DeviceKeyStore` | `backend()`, `open(label)`, `create(label)`, `delete(label)`, `open_or_create(label)` |
+| `DeviceSigner` | `backend()`, `public_key()`, `sign(message)`, `sign_digest(digest)` |
+| `DirectMasterKeyStore` | `backend()`, `store(label, key)`, `load(label)`, `delete(label)` |
+| `WrappedMasterKeyStore` | `backend()`, `store(label, key) -> WrappedMasterKey`, `load(label, &wrapped)`, `delete(label)` |
+| `MasterKey` | 32 bytes; `from_bytes([u8; 32])`, `as_bytes()`; zeroized on drop, `Debug` prints the length only |
+| `WrappedMasterKey` | Opaque platform-wrapped bytes; `from_bytes`, `as_bytes`, `into_bytes` |
+| `PlatformKeyStore` | The current platform's `DeviceKeyStore`; `open_best_available()` returns `Result` on Windows / Android |
+| `PlatformDirectMasterKeyStore` / `PlatformWrappedMasterKeyStore` | The current platform's two master-key stores |
+| `PlatformProvider` | Selects the TPM or software provider on Windows (`Tpm` / `Software`) |
+| `platform_backend_is_implemented()` | Whether this platform has an implementation at all (**never probes hardware**) |
+| `sha256(message)` | The project-wide message digest |
+
+`platform_backend_is_implemented()` answers "does this platform have an implementation", not "can this machine use it"; the runtime answer is `backend()`.
+
+### Errors and contracts
+
+- Every fallible operation returns `Result<T, Error>`; `Error` is `#[non_exhaustive]`.
+- `label` is a persistent name allowing only ASCII letters, digits, `-`, `_` and `.`; `create` never overwrites, while `open_or_create` opens or creates.
+- `delete` is irreversible; ask the user first.
+- `sign` signs a **message**, `sign_digest` signs a **digest**; message mode uses SHA-256, and callers must not hash first.
+- `backend()` must report the real backend; without hardware it returns `Software`, never a pretence of `Tpm`.
+- No input may panic, and no error may contain secret material.
+
 ## The two forms of master key storage
 
 Besides the device identity key, the platform key store holds **the application's master key** — the vault file is encrypted with it. The master key is 32 opaque bytes in `MasterKey`: this crate only moves it between the caller and the platform and derives nothing from it. There are two forms, and **the caller chooses by choosing a type**, not by a runtime flag:

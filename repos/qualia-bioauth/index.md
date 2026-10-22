@@ -83,6 +83,63 @@ magic `Q2FABIO1` (8) | version 1 (1) | backend (1) | wrapped length (4, BE) | wr
 
 `MasterKey` 是 32 字节、`Zeroize`，`Debug` 不打印内容。
 
+## 接口说明
+
+完整签名见 [docs.rs](https://docs.rs/qualia-bioauth)。
+
+### 核心类型
+
+| 项 | 说明 |
+|---|---|
+| `MasterKey` | 32 字节密钥；`from_array([u8; 32])`、`from_bytes(&[u8])`、`expose_secret()`、`ct_eq()`；`Drop` 时擦除，`Debug` 只打印长度 |
+| `MASTER_KEY_LEN` | 32 |
+| `AuthBoundKeyStore` | 平台认证绑定的密钥库 trait |
+| `platform::open_best_available()` | 返回当前平台的最佳实现（`Box<dyn AuthBoundKeyStore>`），不弹窗、不接触平台 |
+
+### `AuthBoundKeyStore` 的方法
+
+| 方法 | 说明 |
+|---|---|
+| `availability()` | 不弹窗地报告这台机器能不能用：`Available` / `Unavailable` / `Unsupported` |
+| `create()` | 创建平台密钥或凭据；可能弹窗；幂等 |
+| `wrap(&master)` | 包裹主密钥，返回完整 blob（含 magic） |
+| `unwrap(&blob)` | 完成一次平台认证并解出主密钥；来自别的后端的 blob 报 `WrongBackend` |
+| `delete_blob(&blob)` | 删除 blob 指向的平台凭据；用于关闭这条路径后清场 |
+| `delete()` | 删除这个库条目的平台密钥；幂等 |
+
+`Availability` 的三个变体是刻意分开的：
+
+| 变体 | 含义 |
+|---|---|
+| `Available { backend, hardware_backed }` | 机制可用；`hardware_backed` 是平台**实际报告**的值 |
+| `Unavailable { reason }` | 机制存在，但这台机器或这个用户当前用不了（没有录入 Hello、指纹被删除、Android 版本过低） |
+| `Unsupported { reason }` | 这个构建没有该平台的后端 |
+
+### 外层格式
+
+| 项 | 说明 |
+|---|---|
+| `AuthBlob` | `magic + version + backend + length + wrapped` |
+| `AuthBlob::new(backend, wrapped)` / `parse(bytes)` / `encode()` | 构造、解析、序列化 |
+| `AuthBlob::backend()` / `wrapped()` / `expect_backend(expected)` | 读取后端与载荷；拒绝别的后端 |
+| `FORMAT_VERSION` / `HEADER_LEN` / `MAX_WRAPPED_LEN` / `MAX_BLOB_LEN` | 格式常量 |
+
+### 宿主侧
+
+| 项 | 说明 |
+|---|---|
+| `PlatformSealer` | 端侧实现「弹一次认证并做一次 AES-GCM」的窄接口 |
+| `DelegatingKeyStore` | 把 `PlatformSealer` 适配成 `AuthBoundKeyStore`，供 FFI 或端侧复用 |
+
+### 错误与契约
+
+- 所有可失败 API 返回 `Result<T, Error>`；`Error` 是 `#[non_exhaustive]`。
+- 平台不可用时返回 `Unavailable` / `Unsupported`，**绝不**退回软件密钥。
+- `wrap` 可能弹窗；`availability` 不弹窗。调用方应先问 `availability` 再决定是否展示这条路。
+- blob 不是秘密，但不要写日志：被复制的 blob 仍然是攻击目标。
+- 任何输入都不得导致 panic；错误与 `Debug` 不包含密钥或载荷字节。
+- `unsafe` 只允许出现在平台后端，每个块都要有 `// SAFETY:`。
+
 ## Windows 后端
 
 要求平台认证器真的能在 `GetAssertion` 里返回 `hmac-secret`。attestation 里的 `bPrfEnabled` **不作为判据**：Windows 11 23H2 实测会创建凭据但把该字段留成 0。库不信任这个字段，第一次断言就是判据——返回 32 字节则成功，被拒绝或没有返回 hmac-secret 才报 `Unavailable`。

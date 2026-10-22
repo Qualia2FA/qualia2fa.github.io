@@ -114,6 +114,63 @@ qualia-transport = { version = "0.1", features = ["iroh-lan"] }
 
 Multicast discovery and QR codes do **not** need it; the feature only brings in the QUIC transport. Three notes: it significantly enlarges the dependency tree and build time; its minimum Rust version is **1.91** (iroh 1.3.0), above this crate's 1.89; and "does not use the network" currently means only "builds no relay, registers no DNS/pkarr, disables HTTPS probing" — packet-capture proof is not finished, so do not claim "this channel has been proven not to use the network".
 
+## Interface
+
+The crate root exports four modules: `qr`, `frame`, `envelope` and `lan`; `lan` splits into `lobby` (multicast discovery) and `transport` (the iroh data plane behind the `iroh-lan` feature). Full signatures are on [docs.rs](https://docs.rs/qualia-transport).
+
+### QR codes (`qr`)
+
+| Item | Notes |
+|---|---|
+| `EcLevel` | `Low` / `Medium` / `Quartile` / `High`; `letter`, `from_letter` |
+| `QrProfile::new(ec, max_version)` | Declare the channel capability; computes both capacities by binary search |
+| `payload_capacity()` / `frame_payload_capacity()` / `exchange_capacity(n)` | One code, one framed code, and an exchange of n codes |
+| `encode_payload(payload)` / `encode_payload_frames(payload, max_frames)` | Single-frame and multi-frame encoding |
+| `qr::encode_text(text, ec, max_version)` | Encode text as-is, without the envelope |
+| `Symbol` | `version`, `ec_level`, `mask`, `size`, `modules`, `module(x, y)`, `render(scale, quiet_zone)` |
+| `qr::scan::decode_text` / `decode_payload` / `decode_frame` | Decode text, a payload, or one frame from pixels |
+| `GrayImage` | A grayscale pixel buffer; input is not an image file |
+
+### Envelope and framing (`envelope`, `frame`)
+
+| Item | Notes |
+|---|---|
+| `envelope::encode(payload)` / `decode(text)` | `Q2FA1:<frame>/<count>:<BASE32>` |
+| `frame::encode_frames(payload, capacity)` | Split a payload at the given capacity |
+| `Frame` / `frame::decode_frame(text)` | One frame and its parser |
+| `Reassembler::new(capacity)` / `from_first_frame()` | Known capacity / learn it from the first frame |
+| `Reassembler::push(text)` / `accept(frame)` | Any order, repeated scans allowed |
+| `missing()` / `received()` / `expected_frames()` | Which codes are missing, how many arrived, how many in total |
+
+### Local network (`lan`)
+
+| Item | Notes |
+|---|---|
+| `LanAddress::new(endpoint_key, port)` | The 42-byte connection record |
+| `encode` / `decode` / `to_qr_text` / `from_qr_text` | Fixed record and single-code text |
+| `to_qr_symbols(profile, max_frames)` / `to_qr_frame_texts(...)` | Hand the record to the QR half |
+| `LanAddressScanner::new()` / `push(text)` / `missing()` / `expected_codes()` | Reassemble a multi-code record |
+| `Lobby::open(me, endpoint_key, port)` / `open_with(...)` | Start announcing and listening |
+| `Lobby::try_poll()` / `poll(timeout)` / `announce_now()` / `shutdown()` / `view()` | Drain events, announce now, stop |
+| `LanConfig` | Multicast group, port, TTL and interface; `interface` narrows the candidates |
+| `Event` / `EventKind` / `Peer` / `PeerStatus` / `LanView` / `candidate_interfaces()` | Discovery results and interface enumeration |
+| `IrohLan::open(device, secret_key)` / `open_with(...)` | Open the QUIC data plane (feature `iroh-lan`) |
+| `remember_peer(PeerAddress)` / `forget_peer(device)` / `connected_peers()` | Register, forget, list peers |
+| `send(Recipient, message)` / `send_blocking` / `try_receive` / `receive_timeout` | Directed or broadcast, non-blocking or timed receive |
+| `shutdown()` | Stop the endpoint and runtime; idempotent |
+| `Recipient` / `PeerAddress` / `ALPN` / `MAX_MESSAGE_LEN` / `INBOX_CAPACITY` | Recipients, dialable addresses and data-plane constants |
+
+A lobby announcement is a fixed 84-byte datagram and a `LanAddress` is a fixed 42 bytes; multicast TTL is 1. Discovery is **not** authenticated; the handshake proves the real identity.
+
+### Errors and contracts
+
+- Every fallible API returns `Result<T, Error>`; `Error` is `#[non_exhaustive]`, so hosts must keep a fallback branch.
+- Not fitting is an error carrying `needed` / `limit`, never an "almost fits" code.
+- Reassembly checks shape only; authentication always sits in the payload's AEAD layer.
+- QR and LAN wire formats are pure logic; only `Lobby` opens sockets, starts a thread and reads the clock.
+- No input may panic; `#![forbid(unsafe_code)]` holds throughout.
+- The library **generates no key material**: QR encoding is deterministic, and the lobby only reads the endpoint key and port the caller supplies.
+
 ## Design contracts
 
 - **Not fitting is an error, not an approximation.** Exceeding the limit returns an error and never produces a code that is "almost" enough. The error carries `needed` and `limit`, so the caller can tell the user how much is missing.

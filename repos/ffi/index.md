@@ -84,7 +84,55 @@ val code = totpCode(parsed.secretBase32, now, period, parsed.algorithm, parsed.d
 
 绑定通过 JNA（JVM）或系统动态加载器（Swift）按**名字**查找动态库，因此 `qualia2fa_ffi.dll` / `libqualia2fa_ffi.so` / `libqualia2fa_ffi.dylib` 必须与应用一起分发，并落在加载器能找到的位置。
 
-## 接口地图
+## 接口说明
+
+本层导出的是 **UniFFI 记录、枚举与对象**，不是 Rust 的 `Result` 以外的类型。下面的表按用途分组；完整签名见 [docs.rs](https://docs.rs/qualia2fa-ffi)。
+
+### 顶层函数
+
+| 分组 | 函数 | 说明 |
+|---|---|---|
+| URI | `parse_otpauth_uri`、`serialize_otpauth_uri` | `otpauth://` 解析与序列化 |
+| 验证码 | `totp_code`、`hotp_code`、`steam_guard_code`、`verify_code_with_drift`、`codes_match` | 计算、容错校验、常量时间比较 |
+| 种子 | `generate_secret_base32`、`recommended_min_secret_len`、`is_secret_shorter_than_recommended`、`secret_byte_len` | 生成与强度判断 |
+| 二维码 | `qr_encode`、`qr_decode`、`qr_decode_text`、`qr_unwrap_text`、`qr_frame_capacity`、`qr_encode_frames` | 编码、解码与多帧 |
+| 解锁密码 | `lock_wrap_len`、`wrap_master_key_with_password`、`unwrap_master_key_with_password`、`lock_marker`、`lock_pending`、`is_lock_marker`、`is_lock_pending`、`is_lock_password_wrap` | 口令包裹与状态文件 |
+| 恢复密钥 | `export_recovery_key_from_master`、`import_recovery_key`、`store_master_key` | 恢复密钥与主密钥保存 |
+| 导入导出 | `detect_import_format`、`export_format_needs_password`、`export_format_extension`、`export_format_carries_groups`、`export_format_group_carrying` | 格式自描述 |
+| 可移植文件 | `detect_portable_file`、`open_portable_file` | `.q2fa` 识别与恢复 |
+| 其它 | `core_version`、`max_group_depth`、`conflict_kind` | 版本、分组深度、冲突分类 |
+
+### 对象
+
+| 对象 | 用途 |
+|---|---|
+| `FfiVault` | 持有保险库与主密钥；条目、分组、同步、导出、恢复密钥 |
+| `FfiImport` | 导入预览、与现有保险库比对、应用选择 |
+| `FfiLogin` / `FfiJoiner` | 登录的两端 |
+| `FfiVerifier` / `FfiResponder` | 挑战-应答的两端 |
+| `FfiSyncSession` | 同步会话与冲突裁决 |
+| `FfiDirectMasterKeyStore` / `FfiWrappedMasterKeyStore` | 主密钥的两种平台存法 |
+| `FfiAuthBoundKeyStore` | 平台认证包裹（Windows Hello 等） |
+| `FfiPlatformKeys` | 平台设备身份：公钥、签名、设备标识、后端 |
+| `FfiLanChannel` / `FfiLanLobby` | 局域网端点与发现 |
+| `FfiFrameCollector` | 多帧二维码的拼装 |
+
+### 记录与枚举
+
+| 分组 | 类型 |
+|---|---|
+| 验证码 | `FfiOtpAuth`、`FfiEntryKind`、`FfiAlgorithm`、`FfiDigits` |
+| 保险库 | `FfiVaultEntry`、`FfiEntryIcon`、`FfiIconMime`、`FfiGroup`、`FfiGroupChild` |
+| 二维码 | `FfiQrImage`、`FfiQrFrame`、`FfiFrameStep`、`FfiEcLevel` |
+| 导入 | `FfiImportFormat`、`FfiImportedEntry`、`FfiImportProblem`、`FfiImportedGroup`、`FfiDroppedSummary`、`FfiImportMatch`、`FfiImportDecision`、`FfiImportChoice`、`FfiImportApplied` |
+| 导出 | `FfiExportFormat`、`FfiGroupCarrying` |
+| 同步 | `FfiPayloadKind`、`FfiRecipient`、`FfiRoster`、`FfiTransportCapabilities`、`FfiReceivedMessage`、`FfiSharePlan`、`FfiConflict`、`FfiConflictSide`、`FfiOrderingConflict`、`FfiDecision`、`FfiSyncOutcome` |
+| 恢复 | `FfiPortableKind`、`FfiPortableRestore` |
+| 认证 | `FfiAuthAvailability` |
+| 局域网 | `FfiLanPeer` |
+| 错误 | `FfiError`、`FfiCoreError` |
+
+`FfiException` 是 Kotlin 侧看到的错误类型，由生成的绑定从 `FfiError` 映射而来；具体分类见下面的[错误分类](#错误分类)。
 
 ### 验证码
 

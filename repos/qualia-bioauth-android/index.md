@@ -20,25 +20,85 @@ Rust crate 管 blob 格式与错误分类，这个库管平台调用；两边都
 ## 用法
 
 ```kotlin
+// availability / seal / unseal 都是 suspend；在后台线程或协程里调用。
 val sealer = KeystoreBiometricSealer(activity)
 
-when (val available = sealer.availability()) {
-    is Availability.Available -> { /* 可以提供生物识别入口 */ }
-    is Availability.Unavailable -> { /* 机制存在，但这个用户当前用不了 */ }
-    is Availability.Unsupported -> { /* API 太低，只能走口令 */ }
+lifecycleScope.launch {
+    when (val available = sealer.availability()) {
+        is Availability.Available -> { /* 可以提供生物识别入口 */ }
+        is Availability.Unavailable -> { /* 机制存在，但这个用户当前用不了 */ }
+        is Availability.Unsupported -> { /* API 太低，只能走口令 */ }
+    }
+
+    // 封印：弹一次认证，返回要持久化的字节。
+    val envelope = sealer.seal(masterKey)
+
+    // 解封：弹一次认证，返回同一把密钥，或抛异常。
+    val restored = sealer.unseal(envelope)
+
+    // 关闭这条路径会删除平台密钥，之前写下的 envelope 随之作废。
+    sealer.delete()
 }
-
-// 封印：弹一次认证，返回要持久化的字节。
-val envelope = sealer.seal(masterKey)
-
-// 解封：弹一次认证，返回同一把密钥，或抛异常。
-val restored = sealer.unseal(envelope)
-
-// 关闭这条路径会删除平台密钥，之前写下的 envelope 随之作废。
-sealer.delete()
 ```
 
 库本身看不到保护 envelope 的那把密钥：Keystore 密钥以 `setUserAuthenticationRequired(true)` 创建，在用户完成认证之前，平台自己就拒绝使用它。
+
+## 接口说明
+
+完整声明见仓库源码与生成的 Dokka 文档。
+
+### `BiometricSealer`
+
+| 成员 | 说明 |
+|---|---|
+| `suspend fun availability(): Availability` | 不弹窗地报告这台设备能不能用 |
+| `suspend fun seal(plaintext: ByteArray): ByteArray` | 弹一次认证，返回要持久化的 envelope |
+| `suspend fun unseal(envelope: ByteArray): ByteArray` | 弹一次认证，返回同一份明文 |
+| `fun delete()` | 删除平台密钥；先前写下的 envelope 随之作废 |
+
+### `KeystoreBiometricSealer`
+
+```kotlin
+class KeystoreBiometricSealer(
+    activity: FragmentActivity,
+    alias: String = DEFAULT_ALIAS,
+    promptInfo: PromptText = PromptText(),
+) : BiometricSealer
+```
+
+| 项 | 说明 |
+|---|---|
+| `activity` | `BiometricPrompt` 的宿主；按界面构造，不要长期持有 |
+| `alias` | Keystore 条目的名字；默认值给单账号场景 |
+| `promptInfo` | 系统弹窗的标题、副标题与取消按钮文案 |
+| `PromptText(title, subtitle, cancel)` | 供调用方按当前界面语言填写 |
+
+### `Availability`
+
+| 变体 | 含义 |
+|---|---|
+| `Available(backend: String, hardwareBacked: Boolean)` | 机制可用；`backend` 是实际答话的后端 |
+| `Unavailable(reason: String)` | 机制存在，但这台设备或这个用户当前用不了 |
+| `Unsupported(reason: String)` | API 太低或设备没有可用机制，只能走口令 |
+
+### 异常
+
+`BiometricAuthException` 是密封类，`seal` / `unseal` 失败时抛出：
+
+| 子类 | 含义 |
+|---|---|
+| `Cancelled` | 用户取消了系统弹窗 |
+| `Unavailable` | 平台机制当前不可用 |
+| `Unsupported` | 构建或 API 不支持 |
+| `EnvelopeInvalid` | envelope 损坏，或不是这个库写的 |
+
+### 契约
+
+- `availability()` 不弹窗；`seal` / `unseal` 会弹窗。调用方应先问可用性，再决定是否展示这条路。
+- 新录入生物识别会让 Keystore 密钥失效，envelope 随之停止打开；调用方应回退到口令，而不是重新创建密钥并覆盖。
+- 平台无法认证时**不退回软件密钥**。
+- 库不做 I/O：envelope 返回给调用方，由它决定写到哪里。
+- 任何输入都不得导致 panic；错误里不包含密钥或 envelope 字节。
 
 ## 它保证什么，不保证什么
 

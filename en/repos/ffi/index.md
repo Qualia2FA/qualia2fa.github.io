@@ -84,7 +84,55 @@ val code = totpCode(parsed.secretBase32, now, period, parsed.algorithm, parsed.d
 
 Bindings find the dynamic library by **name** through JNA (JVM) or the system loader (Swift), so `qualia2fa_ffi.dll` / `libqualia2fa_ffi.so` / `libqualia2fa_ffi.dylib` must ship with the application and land where the loader can find it.
 
-## Interface map
+## Interface
+
+What crosses this layer is **UniFFI records, enums and objects**. The tables below group them by purpose; full signatures are on [docs.rs](https://docs.rs/qualia2fa-ffi).
+
+### Top-level functions
+
+| Group | Functions | Notes |
+|---|---|---|
+| URI | `parse_otpauth_uri`, `serialize_otpauth_uri` | Parse and serialise `otpauth://` |
+| Codes | `totp_code`, `hotp_code`, `steam_guard_code`, `verify_code_with_drift`, `codes_match` | Compute, verify with drift, compare in constant time |
+| Seeds | `generate_secret_base32`, `recommended_min_secret_len`, `is_secret_shorter_than_recommended`, `secret_byte_len` | Generation and strength checks |
+| QR | `qr_encode`, `qr_decode`, `qr_decode_text`, `qr_unwrap_text`, `qr_frame_capacity`, `qr_encode_frames` | Encoding, decoding and framing |
+| Unlock password | `lock_wrap_len`, `wrap_master_key_with_password`, `unwrap_master_key_with_password`, `lock_marker`, `lock_pending`, `is_lock_marker`, `is_lock_pending`, `is_lock_password_wrap` | Wrapping and state files |
+| Recovery | `export_recovery_key_from_master`, `import_recovery_key`, `store_master_key` | Recovery keys and master-key storage |
+| Import/export | `detect_import_format`, `export_format_needs_password`, `export_format_extension`, `export_format_carries_groups`, `export_format_group_carrying` | Format self-description |
+| Portable files | `detect_portable_file`, `open_portable_file` | `.q2fa` detection and restore |
+| Other | `core_version`, `max_group_depth`, `conflict_kind` | Version, group depth, conflict classification |
+
+### Objects
+
+| Object | Purpose |
+|---|---|
+| `FfiVault` | Holds the vault and master key; entries, groups, sync, export, recovery |
+| `FfiImport` | Import preview, comparison against the vault, applying choices |
+| `FfiLogin` / `FfiJoiner` | The two ends of a login |
+| `FfiVerifier` / `FfiResponder` | The two ends of challenge-response |
+| `FfiSyncSession` | Sync sessions and conflict decisions |
+| `FfiDirectMasterKeyStore` / `FfiWrappedMasterKeyStore` | The two platform forms of master-key storage |
+| `FfiAuthBoundKeyStore` | Platform auth-bound wrapping (Windows Hello and others) |
+| `FfiPlatformKeys` | Platform device identity: public key, signature, device ID, backend |
+| `FfiLanChannel` / `FfiLanLobby` | LAN endpoint and discovery |
+| `FfiFrameCollector` | Multi-frame QR reassembly |
+
+### Records and enums
+
+| Group | Types |
+|---|---|
+| Codes | `FfiOtpAuth`, `FfiEntryKind`, `FfiAlgorithm`, `FfiDigits` |
+| Vault | `FfiVaultEntry`, `FfiEntryIcon`, `FfiIconMime`, `FfiGroup`, `FfiGroupChild` |
+| QR | `FfiQrImage`, `FfiQrFrame`, `FfiFrameStep`, `FfiEcLevel` |
+| Import | `FfiImportFormat`, `FfiImportedEntry`, `FfiImportProblem`, `FfiImportedGroup`, `FfiDroppedSummary`, `FfiImportMatch`, `FfiImportDecision`, `FfiImportChoice`, `FfiImportApplied` |
+| Export | `FfiExportFormat`, `FfiGroupCarrying` |
+| Sync | `FfiPayloadKind`, `FfiRecipient`, `FfiRoster`, `FfiTransportCapabilities`, `FfiReceivedMessage`, `FfiSharePlan`, `FfiConflict`, `FfiConflictSide`, `FfiOrderingConflict`, `FfiDecision`, `FfiSyncOutcome` |
+| Restore | `FfiPortableKind`, `FfiPortableRestore` |
+| Authentication | `FfiAuthAvailability` |
+| LAN | `FfiLanPeer` |
+| Errors | `FfiError`, `FfiCoreError` |
+
+`FfiException` is the error type a Kotlin caller sees; the generated bindings map it from `FfiError`. See [Error taxonomy](#error-taxonomy) below.
 
 ### Codes
 

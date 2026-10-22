@@ -77,6 +77,19 @@ qualia-bioauth-android ───────────────────
 - **MSRV：1.89。** `qualia-transport` 打开 `iroh-lan` 时要求 1.91（iroh 1.3.0 的声明），CI 用真实工具链分别验证两个下限。
 - **发布顺序是硬约束：** `qualia-dik` → `qualia2fa-core` → `qualia2fa-ffi`。下游依赖上游在 crates.io 上的具体版本，上游没发布时下游的 `--dry-run` 会解析失败。`qualia-transport`、`qualia-bioauth` 与 `qualia-bioauth-android` 不依赖其它层，可以随时发布。
 
+## 库的公开接口
+
+六个库的接口说明都在各自的仓库页面里，按模块、类型、方法与错误分类整理：
+
+| 库 | 接口说明 |
+|---|---|
+| Qualia2FA-Core | [模块、保险库、注册登录、同步与错误](/repos/core/#接口说明) |
+| Qualia2FA-FFI | [顶层函数、对象、记录与错误分类](/repos/ffi/#接口说明) |
+| QualiaDeviceIdentityKit | [`device` 与 `keystore` 的类型和方法](/repos/qualia-dik/#接口说明) |
+| QualiaTransport | [二维码、拆帧、信封与局域网](/repos/qualia-transport/#接口说明) |
+| QualiaBioAuth | [`AuthBoundKeyStore`、`Availability` 与外层格式](/repos/qualia-bioauth/#接口说明) |
+| QualiaBioAuth-Android | [`BiometricSealer`、`KeystoreBiometricSealer` 与异常](/repos/qualia-bioauth-android/#接口说明) |
+
 ## 从哪里开始
 
 - **想用应用**：读[安装与构建](/guide/getting-started/)，或者直接看[应用本体](/repos/qualia2fa/)。

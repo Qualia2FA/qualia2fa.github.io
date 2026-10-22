@@ -77,6 +77,19 @@ The algorithms are fixed as well: device identity signatures use **ECDSA P-256**
 - **MSRV: 1.89.** `qualia-transport` needs 1.91 when `iroh-lan` is enabled (iroh 1.3.0's declaration). CI verifies both floors with real toolchains.
 - **Publishing order is a hard constraint:** `qualia-dik` → `qualia2fa-core` → `qualia2fa-ffi`. A downstream crate depends on the exact version of its upstream on crates.io, so its `--dry-run` fails if the upstream has not been published. `qualia-transport`, `qualia-bioauth` and `qualia-bioauth-android` depend on no other layer and can be published at any time.
 
+## Library interfaces
+
+Each of the six libraries documents its public surface on its repository page, grouped by module, type, method and error:
+
+| Library | Interface |
+|---|---|
+| Qualia2FA-Core | [Modules, vault, registration, sync and errors](/en/repos/core/#interface) |
+| Qualia2FA-FFI | [Top-level functions, objects, records and errors](/en/repos/ffi/#interface) |
+| QualiaDeviceIdentityKit | [`device` and `keystore` types and methods](/en/repos/qualia-dik/#interface) |
+| QualiaTransport | [QR, framing, envelope and LAN](/en/repos/qualia-transport/#interface) |
+| QualiaBioAuth | [`AuthBoundKeyStore`, `Availability` and the outer format](/en/repos/qualia-bioauth/#interface) |
+| QualiaBioAuth-Android | [`BiometricSealer`, `KeystoreBiometricSealer` and exceptions](/en/repos/qualia-bioauth-android/#interface) |
+
 ## Where to start
 
 - **Using the application:** read [Install and build](/en/guide/getting-started/), or go straight to [the application](/en/repos/qualia2fa/).

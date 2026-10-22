@@ -136,7 +136,7 @@ The wrap file is a fixed 110 bytes and carries its own KDF parameters and random
 
 ## Interface
 
-Every public API is exported from the crate root; full signatures, examples and platform notes live on [docs.rs](https://docs.rs/qualia2fa-core).
+Public APIs are grouped into modules, with the main types re-exported at the crate root; full signatures, examples and platform notes live on [docs.rs](https://docs.rs/qualia2fa-core).
 
 ### Modules and entry points
 
@@ -158,7 +158,7 @@ Every public API is exported from the crate root; full signatures, examples and 
 | `auth` | `Verifier`, `Responder`, `Verified`, `begin`, `accept`, `confirm` | Challenge-response |
 | `sync` | `Payload`, `PayloadHeader`, `PayloadKind`, `Record`, `SyncId`, `derive_record_key`, `derive_envelope_key` | Sync payloads and merging |
 | `transport` | `Transport`, `TransportCapabilities`, `Recipient`, `Roster`, `SyncSession`, `SyncOutcome`, `SharePlan` | Channel abstraction and sessions |
-| `secret` | `SecretBytes`, `SecretString`, `SecretBox`, `ExposeSecret`, `ExposeSecretMut` | Re-exports of the `secrecy` types |
+| Root exports | `SecretBytes`, `SecretString`, `SecretBox`, `ExposeSecret`, `ExposeSecretMut` | `secrecy` types (the `secret` module itself is private) |
 
 ### The vault
 

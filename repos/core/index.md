@@ -135,7 +135,7 @@ let recovered = lock::unwrap(&wrap, &password)?;
 
 ## 接口说明
 
-公开 API 全部从 crate 根导出；完整签名、示例与平台差异见 [docs.rs](https://docs.rs/qualia2fa-core)。
+公开 API 以模块组织，主要类型在 crate 根再导出；完整签名、示例与平台差异见 [docs.rs](https://docs.rs/qualia2fa-core)。
 
 ### 模块与入口
 
@@ -157,7 +157,7 @@ let recovered = lock::unwrap(&wrap, &password)?;
 | `auth` | `Verifier`、`Responder`、`Verified`、`begin`、`accept`、`confirm` | 挑战-应答 |
 | `sync` | `Payload`、`PayloadHeader`、`PayloadKind`、`Record`、`SyncId`、`derive_record_key`、`derive_envelope_key` | 同步载荷与合并 |
 | `transport` | `Transport`、`TransportCapabilities`、`Recipient`、`Roster`、`SyncSession`、`SyncOutcome`、`SharePlan` | 通道抽象与会话 |
-| `secret` | `SecretBytes`、`SecretString`、`SecretBox`、`ExposeSecret`、`ExposeSecretMut` | `secrecy` 类型的再导出 |
+| 根导出 | `SecretBytes`、`SecretString`、`SecretBox`、`ExposeSecret`、`ExposeSecretMut` | `secrecy` 类型（`secret` 模块本身是私有的） |
 
 ### 保险库
 

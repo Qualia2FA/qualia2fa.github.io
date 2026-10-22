@@ -55,7 +55,7 @@ When editing content:
 
 A push to `main` triggers `.github/workflows/deploy.yml`: it installs dependencies, builds, uploads `.vitepress/dist`, and GitHub Pages publishes it. The repository's Pages source must be set to **GitHub Actions**.
 
-This is the user-site repository (`qualia2fa.github.io`), so the build uses `base: /` and needs no CNAME.
+This is the user-site repository (`qualia2fa.github.io`), so the build uses `base: /` and needs no CNAME. The repository currently has the custom domain `qualia2fa.qiushui1012.com`; `qualia2fa.github.io` redirects to it with a 301, and HTTPS is enforced.
 
 ## Licence
 

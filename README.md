@@ -55,7 +55,7 @@ npm run preview
 
 推送到 `main` 会触发 `.github/workflows/deploy.yml`：安装依赖、构建、上传 `.vitepress/dist`，再由 GitHub Pages 发布。仓库的 Pages 来源必须设为 **GitHub Actions**。
 
-站点是用户主页仓库（`qualia2fa.github.io`），因此构建的 `base` 是 `/`，不需要 CNAME。
+站点是用户主页仓库（`qualia2fa.github.io`），因此构建的 `base` 是 `/`，不需要 CNAME。仓库当前绑定了自定义域名 `qualia2fa.qiushui1012.com`；`qualia2fa.github.io` 会 301 到它，HTTPS 已强制开启。
 
 ## 许可
 

@@ -1,0 +1,468 @@
+/* ── Brand ─────────────────────────────────────────────────────── */
+
+:root {
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #0d9488;
+  --vp-c-brand-3: #14b8a6;
+  --vp-c-brand-soft: rgba(13, 148, 136, 0.14);
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #0f766e 18%, #0e7490 82%);
+}
+
+.dark {
+  --vp-c-brand-1: #5eead4;
+  --vp-c-brand-2: #2dd4bf;
+  --vp-c-brand-3: #14b8a6;
+  --vp-c-brand-soft: rgba(45, 212, 191, 0.16);
+  --vp-home-hero-name-background: linear-gradient(120deg, #5eead4 18%, #67e8f9 82%);
+}
+
+.VPHero .VPImage.image-src {
+  width: 168px;
+  height: 168px;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(9, 16, 18, 0.18);
+}
+
+@media (max-width: 700px) {
+  .VPHero .VPImage.image-src {
+    width: 128px;
+    height: 128px;
+  }
+}
+
+.dark .VPHero .VPImage.image-src {
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Language switch ───────────────────────────────────────────── */
+
+/* The default theme's plain locale dropdown is replaced by the switcher below,
+   which also remembers the choice and can return to browser detection. */
+.VPNavBarTranslations,
+.VPNavBarExtra .group.translations,
+.VPNavScreenTranslations {
+  display: none;
+}
+
+.q-lang {
+  position: relative;
+  margin-left: 10px;
+}
+
+.q-lang__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+
+.q-lang__button:hover {
+  color: var(--vp-c-text-1);
+  border-color: var(--vp-c-brand-2);
+}
+
+.q-lang__globe,
+.q-lang__chevron {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.q-lang__chevron {
+  width: 12px;
+  height: 12px;
+  opacity: 0.65;
+}
+
+.q-lang__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-elv);
+  box-shadow: 0 12px 32px rgba(9, 16, 18, 0.16);
+}
+
+.dark .q-lang__menu {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.q-lang__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.q-lang__item:hover {
+  background: var(--vp-c-bg-soft);
+}
+
+.q-lang__item--auto {
+  margin-top: 4px;
+  border-top: 1px solid var(--vp-c-divider);
+  border-radius: 0 0 8px 8px;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+}
+
+.q-lang__check {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--vp-c-brand-1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.q-lang--mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .q-lang {
+    margin-left: 0;
+  }
+
+  .VPNavBar .q-lang {
+    display: none;
+  }
+
+  .q-lang--mobile {
+    display: block;
+    margin: 8px 0 4px;
+  }
+
+  .q-lang--mobile .q-lang__button {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .q-lang--mobile .q-lang__label {
+    flex: 1;
+  }
+
+  .q-lang--mobile .q-lang__menu {
+    position: static;
+    min-width: 0;
+    margin-top: 6px;
+  }
+}
+
+/* ── Home page sections ────────────────────────────────────────── */
+
+.q-section {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 24px 24px 8px;
+}
+
+.q-section__head {
+  max-width: 720px;
+  margin-bottom: 24px;
+}
+
+.q-section__head h2 {
+  margin: 0 0 10px;
+  border: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.q-section__head p,
+.q-section__note {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.q-section__note {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.q-repos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.q-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 14px;
+  background: var(--vp-c-bg-soft);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.vp-doc .q-card,
+.vp-doc .q-card *,
+.vp-doc .q-button,
+.vp-doc .q-button * {
+  text-decoration: none !important;
+}
+
+.q-card:hover {
+  border-color: var(--vp-c-brand-2);
+  box-shadow: 0 10px 28px rgba(9, 16, 18, 0.08);
+  transform: translateY(-2px);
+}
+
+.dark .q-card:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.q-card--wide {
+  grid-column: span 2;
+}
+
+.q-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.q-card__tag {
+  color: var(--vp-c-brand-1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.q-card__version {
+  color: var(--vp-c-text-3);
+  font-family: var(--vp-font-family-mono);
+  font-size: 11px;
+}
+
+.q-card h3 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.q-card p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.q-card__link {
+  margin-top: auto;
+  padding-top: 6px;
+  color: var(--vp-c-brand-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.q-arch {
+  margin: 0;
+  padding: 18px 20px;
+  overflow-x: auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 14px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.q-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 32px 0 8px;
+  padding: 24px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 180% at 0% 0%, var(--vp-c-brand-soft), transparent 60%),
+    var(--vp-c-bg-soft);
+}
+
+.q-cta h2 {
+  margin: 0 0 6px;
+  border: 0;
+  font-size: 20px;
+}
+
+.q-cta p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+}
+
+.q-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.q-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.q-button:hover {
+  border-color: var(--vp-c-brand-2);
+}
+
+.q-button--brand {
+  border-color: transparent;
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-bg);
+}
+
+.q-button--brand:hover {
+  background: var(--vp-c-brand-2);
+}
+
+@media (max-width: 700px) {
+  .q-repos {
+    grid-template-columns: 1fr;
+  }
+
+  .q-card--wide {
+    grid-column: span 1;
+  }
+
+  .q-section {
+    padding: 16px 20px 4px;
+  }
+
+  .q-section__head h2 {
+    font-size: 23px;
+  }
+}
+
+/* ── Repository page header ───────────────────────────────────── */
+
+.q-repo-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px 0 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+}
+
+.q-repo-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.q-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-mono);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.q-pill--version {
+  border-color: transparent;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+.q-repo-head__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.q-repo-head__links a {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+}
+
+.q-repo-head__links a:hover {
+  text-decoration: underline;
+}
+
+/* ── Small polish ─────────────────────────────────────────────── */
+
+.vp-doc table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.vp-doc a {
+  text-underline-offset: 3px;
+}
+
+.vp-doc .custom-block.tip {
+  border-color: var(--vp-c-brand-1);
+}
+
+@media (max-width: 767px) {
+  .VPDoc .content-container {
+    padding-bottom: 32px;
+  }
+}

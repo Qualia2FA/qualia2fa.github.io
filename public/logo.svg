@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100" width="100" height="100">
+  <rect stroke="none" fill="#eaf2f4" x="0" y="0" width="100" height="100" rx="15"/>
+  <g fill="none" stroke="#091012" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M29 15 L71 15 C78.732 15 85 21.268 85 29 L85 51.201 C85 54.914 83.525 58.475 80.899 61.101 L61.101 80.899 C58.475 83.525 54.914 85 51.201 85 L29 85 C21.268 85 15 78.732 15 71 L15 29 C15 21.268 21.268 15 29 15 Z"/>
+
+    <line x1="85" y1="77.5" x2="85" y2="85" />
+    <line x1="77.5" y1="85" x2="85" y2="85" />
+    <line x1="77.5" y1="85" x2="85" y2="77.5" />
+  </g>
+</svg>
